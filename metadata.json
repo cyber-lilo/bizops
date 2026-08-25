@@ -1,0 +1,6 @@
+{
+  "name": "BizOps",
+  "description": "All-in-one Business Operations System, Invoice Maker & Billing Manager, and Daily Email Template Generator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
