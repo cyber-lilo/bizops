@@ -354,11 +354,11 @@ fun EmailTemplateCard(
                     }
 
                     if (template.isCustom) {
-                        IconButton(onClick = onEdit, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(16.dp))
+                        IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Edit, contentDescription = "Edit Template", modifier = Modifier.size(18.dp))
                         }
-                        IconButton(onClick = onDelete, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Delete, contentDescription = "Delete", tint = ErrorRed, modifier = Modifier.size(16.dp))
+                        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                            Icon(Icons.Default.Delete, contentDescription = "Delete Template", tint = ErrorRed, modifier = Modifier.size(18.dp))
                         }
                     }
                 }

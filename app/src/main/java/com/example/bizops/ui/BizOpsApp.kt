@@ -1,8 +1,7 @@
 package com.example.bizops.ui
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.automirrored.outlined.*
@@ -13,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -25,6 +25,7 @@ import com.example.bizops.ui.invoices.CreateEditInvoiceDialog
 import com.example.bizops.ui.invoices.InvoicesScreen
 import com.example.bizops.ui.operations.OperationsHubScreen
 import com.example.bizops.ui.viewmodel.BizOpsViewModel
+import com.example.ui.theme.*
 
 enum class NavigationDestination(
     val title: String,
@@ -66,6 +67,7 @@ fun BizOpsApp(
 ) {
     var currentDestination by remember { mutableStateOf(NavigationDestination.OPERATIONS) }
     var preselectedInvoiceForEmail by remember { mutableStateOf<Invoice?>(null) }
+    var preselectedInvoiceStatusFilter by remember { mutableStateOf<InvoiceStatus?>(null) }
     var showGlobalCreateInvoiceSheet by remember { mutableStateOf(false) }
 
     val clients by viewModel.clients.collectAsStateWithLifecycle()
@@ -86,30 +88,64 @@ fun BizOpsApp(
         bottomBar = {
             NavigationBar(
                 containerColor = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp
+                tonalElevation = 4.dp
             ) {
                 NavigationDestination.values().forEach { destination ->
                     val isSelected = currentDestination == destination
                     NavigationBarItem(
                         selected = isSelected,
-                        onClick = { currentDestination = destination },
+                        onClick = {
+                            if (destination == NavigationDestination.INVOICES) {
+                                preselectedInvoiceStatusFilter = null
+                            }
+                            currentDestination = destination
+                        },
                         icon = {
                             BadgedBox(
                                 badge = {
                                     if (destination == NavigationDestination.INVOICES && pendingInvoicesCount > 0) {
-                                        Badge { Text("$pendingInvoicesCount") }
+                                        Badge(
+                                            containerColor = if (invoices.any { it.status == InvoiceStatus.OVERDUE }) ErrorRed else PrimaryBlue
+                                        ) {
+                                            Text(
+                                                text = "$pendingInvoicesCount",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                                            )
+                                        }
                                     } else if (destination == NavigationDestination.OPERATIONS && activeTasksCount > 0) {
-                                        Badge { Text("$activeTasksCount") }
+                                        Badge(
+                                            containerColor = InfoPurple
+                                        ) {
+                                            Text(
+                                                text = "$activeTasksCount",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                                            )
+                                        }
                                     }
                                 }
                             ) {
                                 Icon(
                                     imageVector = if (isSelected) destination.selectedIcon else destination.unselectedIcon,
-                                    contentDescription = destination.title
+                                    contentDescription = destination.title,
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         },
-                        label = { Text(destination.title) },
+                        label = {
+                            Text(
+                                text = destination.title,
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            )
+                        },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = PrimaryBlue,
+                            selectedTextColor = PrimaryBlue,
+                            indicatorColor = PrimaryBlue.copy(alpha = 0.12f),
+                            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
                         modifier = Modifier.testTag(destination.testTag)
                     )
                 }
@@ -131,8 +167,14 @@ fun BizOpsApp(
                         tasks = tasks,
                         clients = clients,
                         invoices = invoices,
-                        onNavigateToInvoices = { currentDestination = NavigationDestination.INVOICES },
-                        onNavigateToEmails = { currentDestination = NavigationDestination.EMAILS },
+                        onNavigateToInvoices = { statusFilter ->
+                            preselectedInvoiceStatusFilter = statusFilter
+                            currentDestination = NavigationDestination.INVOICES
+                        },
+                        onNavigateToEmails = { invoice ->
+                            preselectedInvoiceForEmail = invoice
+                            currentDestination = NavigationDestination.EMAILS
+                        },
                         onNavigateToClients = { currentDestination = NavigationDestination.CRM_SETTINGS },
                         onOpenCreateInvoice = { showGlobalCreateInvoiceSheet = true }
                     )
@@ -144,6 +186,7 @@ fun BizOpsApp(
                         invoices = invoices,
                         clients = clients,
                         companyProfile = companyProfile,
+                        initialStatusFilter = preselectedInvoiceStatusFilter,
                         onOpenEmailPersonalizerWithInvoice = { invoice ->
                             preselectedInvoiceForEmail = invoice
                             currentDestination = NavigationDestination.EMAILS

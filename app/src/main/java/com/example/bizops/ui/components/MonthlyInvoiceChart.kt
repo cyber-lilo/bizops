@@ -121,7 +121,11 @@ fun MonthlyInvoiceChartCard(
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = 3.dp,
+            pressedElevation = 6.dp
+        ),
         modifier = modifier
             .fillMaxWidth()
             .testTag("monthly_invoice_chart_card")

@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.bizops.data.ai.GeminiOpsService
 import com.example.bizops.data.db.BizOpsDatabase
+import com.example.bizops.data.model.BillingRecord
 import com.example.bizops.data.model.Client
 import com.example.bizops.data.model.CompanyProfile
 import com.example.bizops.data.model.EmailCategory
@@ -21,6 +22,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -55,6 +57,13 @@ class BizOpsViewModel(application: Application) : AndroidViewModel(application) 
 
     val invoices: StateFlow<List<Invoice>> = repository.allInvoices
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val billingRecords: StateFlow<List<BillingRecord>> = repository.allBillingRecords
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val totalCollectedRevenue: StateFlow<Double> = repository.totalCollectedRevenue
+        .map { it ?: 0.0 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val emailTemplates: StateFlow<List<EmailTemplate>> = repository.allTemplates
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -133,11 +142,21 @@ class BizOpsViewModel(application: Application) : AndroidViewModel(application) 
 
     fun updateInvoiceStatus(invoice: Invoice, newStatus: InvoiceStatus) {
         viewModelScope.launch {
-            val updated = invoice.copy(
-                status = newStatus,
-                paidDate = if (newStatus == InvoiceStatus.PAID) System.currentTimeMillis() else invoice.paidDate
-            )
-            repository.updateInvoice(updated)
+            if (newStatus == InvoiceStatus.PAID) {
+                repository.markInvoiceAsPaid(invoice)
+            } else {
+                val updated = invoice.copy(
+                    status = newStatus,
+                    paidDate = if (newStatus == InvoiceStatus.PAID) System.currentTimeMillis() else invoice.paidDate
+                )
+                repository.updateInvoice(updated)
+            }
+        }
+    }
+
+    fun markInvoiceAsPaid(invoice: Invoice, paymentMethod: String = "Bank Wire", reference: String = "") {
+        viewModelScope.launch {
+            repository.markInvoiceAsPaid(invoice, paymentMethod, reference)
         }
     }
 
@@ -160,6 +179,23 @@ class BizOpsViewModel(application: Application) : AndroidViewModel(application) 
     fun deleteInvoice(invoice: Invoice) {
         viewModelScope.launch {
             repository.deleteInvoice(invoice)
+        }
+    }
+
+    // --- Billing Record Actions ---
+    fun saveBillingRecord(record: BillingRecord) {
+        viewModelScope.launch {
+            if (record.id == 0L) {
+                repository.insertBillingRecord(record)
+            } else {
+                repository.updateBillingRecord(record)
+            }
+        }
+    }
+
+    fun deleteBillingRecord(record: BillingRecord) {
+        viewModelScope.launch {
+            repository.deleteBillingRecord(record)
         }
     }
 

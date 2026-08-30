@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 // Primary Indigo / Deep Navy palette
 val PrimaryNavy = Color(0xFF0F172A)
 val PrimaryBlue = Color(0xFF2563EB)
+val PrimaryBlueDark = Color(0xFF1D4ED8)
 val PrimaryBlueLight = Color(0xFF60A5FA)
 val SecondarySlate = Color(0xFF475569)
 val SecondarySlateLight = Color(0xFF94A3B8)
@@ -25,10 +26,15 @@ val SurfaceLight = Color(0xFFFFFFFF)
 val SurfaceVariantLight = Color(0xFFF1F5F9)
 val OnSurfaceLight = Color(0xFF0F172A)
 val OnSurfaceVariantLight = Color(0xFF64748B)
+val OutlineLight = Color(0xFFCBD5E1)
+val OutlineVariantLight = Color(0xFFE2E8F0)
 
 val BackgroundDark = Color(0xFF0B0F19)
 val SurfaceDark = Color(0xFF131B2E)
 val SurfaceVariantDark = Color(0xFF1E293B)
 val OnSurfaceDark = Color(0xFFF8FAFC)
 val OnSurfaceVariantDark = Color(0xFF94A3B8)
+val OutlineDark = Color(0xFF334155)
+val OutlineVariantDark = Color(0xFF1E293B)
+
 

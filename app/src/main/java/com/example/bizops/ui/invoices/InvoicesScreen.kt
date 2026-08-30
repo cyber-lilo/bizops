@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -55,6 +56,7 @@ import com.example.bizops.ui.viewmodel.BizOpsViewModel
 import com.example.bizops.util.InvoicePdfExporter
 import com.example.bizops.util.LogoPresetManager
 import com.example.ui.theme.*
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -67,10 +69,13 @@ fun InvoicesScreen(
     clients: List<Client>,
     companyProfile: CompanyProfile,
     onOpenEmailPersonalizerWithInvoice: (Invoice) -> Unit,
+    initialStatusFilter: InvoiceStatus? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    var selectedStatusFilter by remember { mutableStateOf<InvoiceStatus?>(null) }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var selectedStatusFilter by remember(initialStatusFilter) { mutableStateOf<InvoiceStatus?>(initialStatusFilter) }
     var searchQuery by remember { mutableStateOf("") }
 
     var invoiceToEdit by remember { mutableStateOf<Invoice?>(null) }
@@ -95,6 +100,7 @@ fun InvoicesScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -218,41 +224,111 @@ fun InvoicesScreen(
                 }
             } else {
                 items(filteredInvoices, key = { it.id }) { invoice ->
-                    InvoiceCard(
-                        invoice = invoice,
-                        onPreview = {
-                            previewInvoice = invoice
-                            showPreviewDialog = true
-                        },
-                        onChooseStyle = {
-                            styleSelectionInvoice = invoice
-                            showStyleSelectionDialog = true
-                        },
-                        onEdit = {
-                            invoiceToEdit = invoice
-                            showEditDialog = true
-                        },
-                        onSendEmail = {
-                            onOpenEmailPersonalizerWithInvoice(invoice)
-                        },
-                        onExportPdf = {
-                            InvoicePdfExporter.sharePdf(context, invoice, companyProfile)
-                        },
-                        onSavePdf = {
-                            InvoicePdfExporter.savePdfToDownloads(context, invoice, companyProfile)
-                        },
-                        onMarkStatus = { newStatus ->
-                            viewModel.updateInvoiceStatus(invoice, newStatus)
-                        },
-                        onDuplicate = {
-                            viewModel.duplicateInvoice(invoice)
-                            Toast.makeText(context, "Invoice duplicated", Toast.LENGTH_SHORT).show()
-                        },
-                        onDelete = {
-                            viewModel.deleteInvoice(invoice)
-                            Toast.makeText(context, "Invoice deleted", Toast.LENGTH_SHORT).show()
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { dismissValue ->
+                            if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                                viewModel.deleteInvoice(invoice)
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "Invoice ${invoice.invoiceNumber} deleted",
+                                        actionLabel = "Undo",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        viewModel.saveInvoice(invoice)
+                                    }
+                                }
+                                true
+                            } else {
+                                false
+                            }
                         }
                     )
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        enableDismissFromStartToEnd = false,
+                        enableDismissFromEndToStart = true,
+                        backgroundContent = {
+                            val color by animateColorAsState(
+                                targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) ErrorRed else ErrorRed.copy(alpha = 0.85f),
+                                label = "swipe_delete_invoice_bg"
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(color)
+                                    .padding(horizontal = 24.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete Invoice",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Text(
+                                        text = "Delete",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        InvoiceCard(
+                            invoice = invoice,
+                            onPreview = {
+                                previewInvoice = invoice
+                                showPreviewDialog = true
+                            },
+                            onChooseStyle = {
+                                styleSelectionInvoice = invoice
+                                showStyleSelectionDialog = true
+                            },
+                            onEdit = {
+                                invoiceToEdit = invoice
+                                showEditDialog = true
+                            },
+                            onSendEmail = {
+                                onOpenEmailPersonalizerWithInvoice(invoice)
+                            },
+                            onExportPdf = {
+                                InvoicePdfExporter.sharePdf(context, invoice, companyProfile)
+                            },
+                            onSavePdf = {
+                                InvoicePdfExporter.savePdfToDownloads(context, invoice, companyProfile)
+                            },
+                            onMarkStatus = { newStatus ->
+                                viewModel.updateInvoiceStatus(invoice, newStatus)
+                            },
+                            onDuplicate = {
+                                viewModel.duplicateInvoice(invoice)
+                                Toast.makeText(context, "Invoice duplicated", Toast.LENGTH_SHORT).show()
+                            },
+                            onDelete = {
+                                viewModel.deleteInvoice(invoice)
+                                scope.launch {
+                                    val result = snackbarHostState.showSnackbar(
+                                        message = "Invoice ${invoice.invoiceNumber} deleted",
+                                        actionLabel = "Undo",
+                                        duration = SnackbarDuration.Short
+                                    )
+                                    if (result == SnackbarResult.ActionPerformed) {
+                                        viewModel.saveInvoice(invoice)
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }

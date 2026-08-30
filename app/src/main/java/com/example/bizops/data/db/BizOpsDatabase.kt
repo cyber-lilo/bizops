@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.bizops.data.model.BillingRecord
 import com.example.bizops.data.model.Client
 import com.example.bizops.data.model.CompanyProfile
 import com.example.bizops.data.model.EmailCategory
@@ -25,6 +26,7 @@ import kotlinx.coroutines.launch
         Client::class,
         OperationTask::class,
         Invoice::class,
+        BillingRecord::class,
         EmailTemplate::class,
         CompanyProfile::class
     ],
@@ -37,6 +39,7 @@ abstract class BizOpsDatabase : RoomDatabase() {
     abstract fun clientDao(): ClientDao
     abstract fun taskDao(): OperationTaskDao
     abstract fun invoiceDao(): InvoiceDao
+    abstract fun billingRecordDao(): BillingRecordDao
     abstract fun emailTemplateDao(): EmailTemplateDao
     abstract fun companyProfileDao(): CompanyProfileDao
 
@@ -77,6 +80,7 @@ abstract class BizOpsDatabase : RoomDatabase() {
             val clientDao = db.clientDao()
             val taskDao = db.taskDao()
             val invoiceDao = db.invoiceDao()
+            val billingDao = db.billingRecordDao()
             val templateDao = db.emailTemplateDao()
 
             // 1. Initial Company Profile
@@ -381,7 +385,60 @@ abstract class BizOpsDatabase : RoomDatabase() {
             invoiceDao.insertInvoice(invoice5)
             invoiceDao.insertInvoice(invoice6)
 
-            // 5. Initial Rich Daily Email Template Library
+            // 5. Initial Billing & Payment Ledger Records
+            val billingRecords = listOf(
+                BillingRecord(
+                    invoiceId = 3,
+                    invoiceNumber = "INV-2026-003",
+                    clientName = "Elena Rostova (Solaria Biotech Labs)",
+                    amount = invoice3.totalAmount,
+                    currency = "$",
+                    paymentDate = now - dayMs * 12,
+                    paymentMethod = "Bank Wire",
+                    transactionReference = "WIRE-SVB-89210492",
+                    notes = "Settled in full via Fedwire transfer.",
+                    status = "SETTLED"
+                ),
+                BillingRecord(
+                    invoiceId = 4,
+                    invoiceNumber = "INV-2026-004",
+                    clientName = "Sarah Jenkins (Nexus Dynamics Corp)",
+                    amount = invoice4.totalAmount,
+                    currency = "$",
+                    paymentDate = now - dayMs * 42,
+                    paymentMethod = "ACH Transfer",
+                    transactionReference = "ACH-NXD-4019283",
+                    notes = "Milestone 1 retainer payment received.",
+                    status = "SETTLED"
+                ),
+                BillingRecord(
+                    invoiceId = 5,
+                    invoiceNumber = "INV-2026-005",
+                    clientName = "Marcus Chen (Vanguard Logistics)",
+                    amount = invoice5.totalAmount,
+                    currency = "$",
+                    paymentDate = now - dayMs * 72,
+                    paymentMethod = "Bank Wire",
+                    transactionReference = "WIRE-VGL-3819201",
+                    notes = "Pipeline setup contract payment.",
+                    status = "SETTLED"
+                ),
+                BillingRecord(
+                    invoiceId = 6,
+                    invoiceNumber = "INV-2026-006",
+                    clientName = "Elena Rostova (Solaria Biotech Labs)",
+                    amount = invoice6.totalAmount,
+                    currency = "$",
+                    paymentDate = now - dayMs * 102,
+                    paymentMethod = "Credit Card",
+                    transactionReference = "CC-AUTH-839210",
+                    notes = "Sprint 1 retainer settled online.",
+                    status = "SETTLED"
+                )
+            )
+            billingDao.insertBillingRecords(billingRecords)
+
+            // 6. Initial Rich Daily Email Template Library
             val emailTemplates = listOf(
                 EmailTemplate(
                     title = "Invoice Attached & Payment Details",

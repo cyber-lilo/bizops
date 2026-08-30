@@ -15,7 +15,7 @@ private val DarkColorScheme =
   darkColorScheme(
     primary = PrimaryBlueLight,
     onPrimary = PrimaryNavy,
-    primaryContainer = PrimaryBlue,
+    primaryContainer = PrimaryBlueDark,
     onPrimaryContainer = Color.White,
     secondary = SecondarySlateLight,
     onSecondary = PrimaryNavy,
@@ -27,6 +27,8 @@ private val DarkColorScheme =
     onBackground = OnSurfaceDark,
     onSurface = OnSurfaceDark,
     onSurfaceVariant = OnSurfaceVariantDark,
+    outline = OutlineDark,
+    outlineVariant = OutlineVariantDark,
     error = ErrorRedLight,
   )
 
@@ -50,14 +52,15 @@ private val LightColorScheme =
     onBackground = OnSurfaceLight,
     onSurface = OnSurfaceLight,
     onSurfaceVariant = OnSurfaceVariantLight,
+    outline = OutlineLight,
+    outlineVariant = OutlineVariantLight,
     error = ErrorRed,
   )
 
 @Composable
 fun MyApplicationTheme(
   darkTheme: Boolean = isSystemInDarkTheme(),
-  // Dynamic color is available on Android 12+
-  dynamicColor: Boolean = true,
+  dynamicColor: Boolean = false,
   content: @Composable () -> Unit,
 ) {
   val colorScheme =

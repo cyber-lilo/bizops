@@ -3,7 +3,9 @@ package com.example.bizops.ui.clients
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -17,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -28,6 +31,7 @@ import com.example.bizops.data.model.CompanyProfile
 import com.example.bizops.ui.components.EmptyStateView
 import com.example.bizops.ui.viewmodel.BizOpsViewModel
 import com.example.ui.theme.*
+import kotlinx.coroutines.launch
 
 enum class ClientsTab(val title: String) {
     CLIENTS("Client CRM"),
@@ -43,6 +47,8 @@ fun ClientsAndSettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     var selectedTab by remember { mutableStateOf(ClientsTab.CLIENTS) }
     var searchQuery by remember { mutableStateOf("") }
 
@@ -59,6 +65,7 @@ fun ClientsAndSettingsScreen(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -177,29 +184,99 @@ fun ClientsAndSettingsScreen(
                             }
                         } else {
                             items(filteredClients, key = { it.id }) { client ->
-                                ClientCard(
-                                    client = client,
-                                    onEdit = {
-                                        clientToEdit = client
-                                        showClientDialog = true
-                                    },
-                                    onDelete = {
-                                        viewModel.deleteClient(client)
-                                        Toast.makeText(context, "Client removed", Toast.LENGTH_SHORT).show()
-                                    },
-                                    onCall = {
-                                        if (client.phone.isNotBlank()) {
-                                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${client.phone}"))
-                                            context.startActivity(intent)
-                                        }
-                                    },
-                                    onEmail = {
-                                        if (client.email.isNotBlank()) {
-                                            val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${client.email}"))
-                                            context.startActivity(intent)
+                                val dismissState = rememberSwipeToDismissBoxState(
+                                    confirmValueChange = { dismissValue ->
+                                        if (dismissValue == SwipeToDismissBoxValue.EndToStart) {
+                                            viewModel.deleteClient(client)
+                                            scope.launch {
+                                                val result = snackbarHostState.showSnackbar(
+                                                    message = "Client \"${client.name.ifBlank { client.company }}\" deleted",
+                                                    actionLabel = "Undo",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                                if (result == SnackbarResult.ActionPerformed) {
+                                                    viewModel.saveClient(client)
+                                                }
+                                            }
+                                            true
+                                        } else {
+                                            false
                                         }
                                     }
                                 )
+
+                                SwipeToDismissBox(
+                                    state = dismissState,
+                                    enableDismissFromStartToEnd = false,
+                                    enableDismissFromEndToStart = true,
+                                    backgroundContent = {
+                                        val color by animateColorAsState(
+                                            targetValue = if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) ErrorRed else ErrorRed.copy(alpha = 0.85f),
+                                            label = "swipe_delete_client_bg"
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .clip(RoundedCornerShape(16.dp))
+                                                .background(color)
+                                                .padding(horizontal = 24.dp),
+                                            contentAlignment = Alignment.CenterEnd
+                                        ) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Delete,
+                                                    contentDescription = "Delete Client",
+                                                    tint = Color.White,
+                                                    modifier = Modifier.size(24.dp)
+                                                )
+                                                Text(
+                                                    text = "Delete",
+                                                    style = MaterialTheme.typography.titleSmall.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = Color.White
+                                                    )
+                                                )
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    ClientCard(
+                                        client = client,
+                                        onEdit = {
+                                            clientToEdit = client
+                                            showClientDialog = true
+                                        },
+                                        onDelete = {
+                                            viewModel.deleteClient(client)
+                                            scope.launch {
+                                                val result = snackbarHostState.showSnackbar(
+                                                    message = "Client \"${client.name.ifBlank { client.company }}\" deleted",
+                                                    actionLabel = "Undo",
+                                                    duration = SnackbarDuration.Short
+                                                )
+                                                if (result == SnackbarResult.ActionPerformed) {
+                                                    viewModel.saveClient(client)
+                                                }
+                                            }
+                                        },
+                                        onCall = {
+                                            if (client.phone.isNotBlank()) {
+                                                val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${client.phone}"))
+                                                context.startActivity(intent)
+                                            }
+                                        },
+                                        onEmail = {
+                                            if (client.email.isNotBlank()) {
+                                                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${client.email}"))
+                                                context.startActivity(intent)
+                                            }
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -311,25 +388,37 @@ fun ClientCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (client.phone.isNotBlank()) {
-                        FilledTonalIconButton(onClick = onCall, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.Phone, contentDescription = "Call", modifier = Modifier.size(16.dp))
+                        FilledTonalIconButton(
+                            onClick = onCall,
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Icon(Icons.Default.Phone, contentDescription = "Call Client", modifier = Modifier.size(18.dp))
                         }
                     }
                     if (client.email.isNotBlank()) {
-                        FilledTonalIconButton(onClick = onEmail, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.Mail, contentDescription = "Email", modifier = Modifier.size(16.dp))
+                        FilledTonalIconButton(
+                            onClick = onEmail,
+                            modifier = Modifier.size(42.dp)
+                        ) {
+                            Icon(Icons.Default.Mail, contentDescription = "Email Client", modifier = Modifier.size(18.dp))
                         }
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    IconButton(onClick = onEdit, modifier = Modifier.size(34.dp)) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.size(18.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Client", modifier = Modifier.size(20.dp))
                     }
-                    IconButton(onClick = onDelete, modifier = Modifier.size(34.dp)) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = ErrorRed, modifier = Modifier.size(18.dp))
+                    IconButton(
+                        onClick = onDelete,
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete Client", tint = ErrorRed, modifier = Modifier.size(20.dp))
                     }
                 }
             }

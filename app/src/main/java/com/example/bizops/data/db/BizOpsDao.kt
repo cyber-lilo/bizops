@@ -6,10 +6,13 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.example.bizops.data.model.BillingRecord
 import com.example.bizops.data.model.Client
 import com.example.bizops.data.model.CompanyProfile
+import com.example.bizops.data.model.EmailCategory
 import com.example.bizops.data.model.EmailTemplate
 import com.example.bizops.data.model.Invoice
+import com.example.bizops.data.model.InvoiceStatus
 import com.example.bizops.data.model.OperationTask
 import com.example.bizops.data.model.TaskStatus
 import kotlinx.coroutines.flow.Flow
@@ -67,11 +70,20 @@ interface InvoiceDao {
     @Query("SELECT * FROM invoices WHERE id = :id")
     suspend fun getInvoiceById(id: Long): Invoice?
 
+    @Query("SELECT * FROM invoices WHERE invoiceNumber = :invoiceNumber LIMIT 1")
+    suspend fun getInvoiceByNumber(invoiceNumber: String): Invoice?
+
     @Query("SELECT * FROM invoices WHERE clientId = :clientId ORDER BY createdAt DESC")
     fun getInvoicesForClient(clientId: Long): Flow<List<Invoice>>
 
+    @Query("SELECT * FROM invoices WHERE status = :status ORDER BY dueDate ASC")
+    fun getInvoicesByStatus(status: InvoiceStatus): Flow<List<Invoice>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertInvoice(invoice: Invoice): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertInvoices(invoices: List<Invoice>)
 
     @Update
     suspend fun updateInvoice(invoice: Invoice)
@@ -81,12 +93,48 @@ interface InvoiceDao {
 
     @Query("DELETE FROM invoices WHERE id = :id")
     suspend fun deleteInvoiceById(id: Long)
+
+    @Query("UPDATE invoices SET status = :status, paidDate = :paidDate WHERE id = :id")
+    suspend fun updateInvoiceStatus(id: Long, status: InvoiceStatus, paidDate: Long?)
+}
+
+@Dao
+interface BillingRecordDao {
+    @Query("SELECT * FROM billing_records ORDER BY paymentDate DESC")
+    fun getAllBillingRecords(): Flow<List<BillingRecord>>
+
+    @Query("SELECT * FROM billing_records WHERE invoiceId = :invoiceId ORDER BY paymentDate DESC")
+    fun getBillingRecordsForInvoice(invoiceId: Long): Flow<List<BillingRecord>>
+
+    @Query("SELECT * FROM billing_records WHERE id = :id")
+    suspend fun getBillingRecordById(id: Long): BillingRecord?
+
+    @Query("SELECT SUM(amount) FROM billing_records WHERE status = 'SETTLED'")
+    fun getTotalCollectedRevenue(): Flow<Double?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBillingRecord(record: BillingRecord): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertBillingRecords(records: List<BillingRecord>)
+
+    @Update
+    suspend fun updateBillingRecord(record: BillingRecord)
+
+    @Delete
+    suspend fun deleteBillingRecord(record: BillingRecord)
+
+    @Query("DELETE FROM billing_records WHERE id = :id")
+    suspend fun deleteBillingRecordById(id: Long)
 }
 
 @Dao
 interface EmailTemplateDao {
     @Query("SELECT * FROM email_templates ORDER BY isCustom DESC, usageCount DESC, title ASC")
     fun getAllTemplates(): Flow<List<EmailTemplate>>
+
+    @Query("SELECT * FROM email_templates WHERE category = :category ORDER BY usageCount DESC, title ASC")
+    fun getTemplatesByCategory(category: EmailCategory): Flow<List<EmailTemplate>>
 
     @Query("SELECT * FROM email_templates WHERE id = :id")
     suspend fun getTemplateById(id: Long): EmailTemplate?
@@ -102,6 +150,9 @@ interface EmailTemplateDao {
 
     @Delete
     suspend fun deleteTemplate(template: EmailTemplate)
+
+    @Query("DELETE FROM email_templates WHERE id = :id")
+    suspend fun deleteTemplateById(id: Long)
 
     @Query("UPDATE email_templates SET usageCount = usageCount + 1, lastUsedAt = :timestamp WHERE id = :id")
     suspend fun incrementTemplateUsage(id: Long, timestamp: Long = System.currentTimeMillis())

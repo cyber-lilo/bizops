@@ -1,6 +1,7 @@
 package com.example.bizops.data.repository
 
 import com.example.bizops.data.db.BizOpsDatabase
+import com.example.bizops.data.model.BillingRecord
 import com.example.bizops.data.model.Client
 import com.example.bizops.data.model.CompanyProfile
 import com.example.bizops.data.model.EmailCategory
@@ -51,8 +52,14 @@ class BizOpsRepository(private val database: BizOpsDatabase) {
 
     suspend fun getInvoiceById(id: Long): Invoice? = database.invoiceDao().getInvoiceById(id)
 
+    suspend fun getInvoiceByNumber(invoiceNumber: String): Invoice? =
+        database.invoiceDao().getInvoiceByNumber(invoiceNumber)
+
     fun getInvoicesForClient(clientId: Long): Flow<List<Invoice>> =
         database.invoiceDao().getInvoicesForClient(clientId)
+
+    fun getInvoicesByStatus(status: InvoiceStatus): Flow<List<Invoice>> =
+        database.invoiceDao().getInvoicesByStatus(status)
 
     suspend fun insertInvoice(invoice: Invoice): Long = database.invoiceDao().insertInvoice(invoice)
 
@@ -62,18 +69,57 @@ class BizOpsRepository(private val database: BizOpsDatabase) {
 
     suspend fun deleteInvoiceById(id: Long) = database.invoiceDao().deleteInvoiceById(id)
 
-    suspend fun markInvoiceAsPaid(invoice: Invoice) {
+    suspend fun markInvoiceAsPaid(invoice: Invoice, paymentMethod: String = "Bank Wire", reference: String = "") {
+        val paidTimestamp = System.currentTimeMillis()
         val updated = invoice.copy(
             status = InvoiceStatus.PAID,
-            paidDate = System.currentTimeMillis()
+            paidDate = paidTimestamp
         )
         database.invoiceDao().updateInvoice(updated)
+
+        // Automatically log settled billing record
+        val billingRecord = BillingRecord(
+            invoiceId = invoice.id,
+            invoiceNumber = invoice.invoiceNumber,
+            clientName = invoice.clientCompany.ifBlank { invoice.clientName },
+            amount = invoice.totalAmount,
+            currency = invoice.currency,
+            paymentDate = paidTimestamp,
+            paymentMethod = paymentMethod,
+            transactionReference = reference.ifBlank { "REC-${System.currentTimeMillis() % 1000000}" },
+            notes = "Payment received and logged into Room database.",
+            status = "SETTLED"
+        )
+        database.billingRecordDao().insertBillingRecord(billingRecord)
     }
 
     suspend fun markInvoiceAsSent(invoice: Invoice) {
         val updated = invoice.copy(status = InvoiceStatus.SENT)
         database.invoiceDao().updateInvoice(updated)
     }
+
+    // --- Billing Records ---
+    val allBillingRecords: Flow<List<BillingRecord>> = database.billingRecordDao().getAllBillingRecords()
+
+    val totalCollectedRevenue: Flow<Double?> = database.billingRecordDao().getTotalCollectedRevenue()
+
+    fun getBillingRecordsForInvoice(invoiceId: Long): Flow<List<BillingRecord>> =
+        database.billingRecordDao().getBillingRecordsForInvoice(invoiceId)
+
+    suspend fun getBillingRecordById(id: Long): BillingRecord? =
+        database.billingRecordDao().getBillingRecordById(id)
+
+    suspend fun insertBillingRecord(record: BillingRecord): Long =
+        database.billingRecordDao().insertBillingRecord(record)
+
+    suspend fun updateBillingRecord(record: BillingRecord) =
+        database.billingRecordDao().updateBillingRecord(record)
+
+    suspend fun deleteBillingRecord(record: BillingRecord) =
+        database.billingRecordDao().deleteBillingRecord(record)
+
+    suspend fun deleteBillingRecordById(id: Long) =
+        database.billingRecordDao().deleteBillingRecordById(id)
 
     // --- Email Templates ---
     val allTemplates: Flow<List<EmailTemplate>> = database.emailTemplateDao().getAllTemplates()
@@ -97,6 +143,9 @@ class BizOpsRepository(private val database: BizOpsDatabase) {
 
     suspend fun deleteTemplate(template: EmailTemplate) =
         database.emailTemplateDao().deleteTemplate(template)
+
+    suspend fun deleteTemplateById(id: Long) =
+        database.emailTemplateDao().deleteTemplateById(id)
 
     suspend fun recordTemplateUsage(id: Long) =
         database.emailTemplateDao().incrementTemplateUsage(id)
