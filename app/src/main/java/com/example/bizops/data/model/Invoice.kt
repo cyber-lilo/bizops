@@ -23,12 +23,14 @@ data class InvoiceItem(
 data class Invoice(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
-    val invoiceNumber: String,
+    val invoiceNumber: String = "",
     val clientId: Long? = null,
     val clientName: String = "",
     val clientCompany: String = "",
     val clientEmail: String = "",
     val clientAddress: String = "",
+    val amount: Double = 0.0,
+    val date: Long = System.currentTimeMillis(),
     val senderName: String = "BizOps Studio LLC",
     val senderCompany: String = "BizOps Enterprise Solutions",
     val senderEmail: String = "billing@bizops.example.com",
@@ -68,7 +70,10 @@ data class Invoice(
         get() = (taxableAmount * (taxPercent / 100.0))
 
     val totalAmount: Double
-        get() = (taxableAmount + taxAmount + shippingOrFee).coerceAtLeast(0.0)
+        get() {
+            val calculated = (taxableAmount + taxAmount + shippingOrFee).coerceAtLeast(0.0)
+            return if (calculated > 0.0 || items.isNotEmpty()) calculated else amount
+        }
 
     fun formattedTotal(): String {
         return "$currency${String.format(Locale.US, "%,.2f", totalAmount)}"
